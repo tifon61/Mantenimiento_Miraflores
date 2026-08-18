@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <h1>Mantenimiento_Miraflores</h1>
+      <span>· cargar una tarea</span>
+    </div>
+  </div>
+
+  <div class="wrap" style="max-width:560px;">
+    <div class="card">
+      <p style="margin-top:0; color:var(--ink-soft); font-size:13.5px;">
+        Contanos qué hay que reparar o revisar. Esto se guarda automáticamente
+        y queda a la vista en el panel de mantenimiento.
+      </p>
+
+      <form id="formTarea">
+        <label for="titulo">¿Qué pasa? (título corto)</label>
+        <input type="text" id="titulo" placeholder="Ej: Pierde agua la canilla de la cocina" required>
+
+        <label for="ubicacion">Ubicación</label>
+        <select id="ubicacion">
+          <option>Cocina</option>
+          <option>Salón</option>
+          <option>Baño</option>
+          <option>Barra</option>
+          <option>Depósito</option>
+          <option>Exterior</option>
+          <option>Otro</option>
+        </select>
+
+        <label>Urgencia</label>
+        <div class="semaforo" id="semaforo">
+          <div class="opcion rojo" data-valor="Rojo">
+            <div class="luz"></div>Urgente
+          </div>
+          <div class="opcion amarillo" data-valor="Amarillo">
+            <div class="luz"></div>Puede esperar
+          </div>
+          <div class="opcion verde" data-valor="Verde">
+            <div class="luz"></div>Sin apuro
+          </div>
+        </div>
+        <div class="hint">Urgente = mandame un aviso ya. Puede esperar = para tu próxima visita. Sin apuro = cuando tengas un rato.</div>
+
+        <label for="descripcion">Descripción</label>
+        <textarea id="descripcion" placeholder="Contá con el mayor detalle posible: qué notaste, desde cuándo, etc." required></textarea>
+
+        <label for="foto">Foto (opcional, pero ayuda mucho)</label>
+        <input type="file" id="foto" accept="image/*" capture="environment">
+        <div class="hint" id="fotoHint"></div>
+
+        <label for="reportadoPor">Tu nombre (opcional)</label>
+        <input type="text" id="reportadoPor" placeholder="Para saber quién avisó">
+
+        <div style="margin-top:22px; display:flex; gap:10px;">
+          <button type="submit" class="primary" id="btnEnviar" style="flex:1;">Enviar tarea</button>
+        </div>
+      </form>
+
+      <div id="confirmacion" style="display:none; text-align:center; padding: 20px 0;">
+        <h2 style="color:var(--verde); font-size:18px;">✓ Tarea enviada</h2>
+        <p class="mono" id="idGenerado" style="font-size:13px; color:var(--ink-soft);"></p>
+        <p style="font-size:13.5px;">Gracias, ya quedó registrada.</p>
+        <button id="btnOtra">Cargar otra tarea</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" style="display:none;"></div>
+
+  <script>
+    // --- Selector de urgencia tipo semáforo ---
+    let urgenciaSeleccionada = null;
+    document.querySelectorAll('#semaforo .opcion').forEach(el => {
+      el.addEventListener('click', () => {
+        document.querySelectorAll('#semaforo .opcion').forEach(o => o.classList.remove('selected'));
+        el.classList.add('selected');
+        urgenciaSeleccionada = el.dataset.valor;
+      });
+    });
+
+    // --- Convierte y comprime la foto a base64 antes de enviarla ---
+    // (así no mandamos fotos de 8MB del celular, se achican a un ancho
+    // máximo de 1200px, que alcanza de sobra para verlas en el panel)
+    function comprimirImagen(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const maxAncho = 1200;
+            const escala = Math.min(1, maxAncho / img.width);
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width * escala;
+            canvas.height = img.height * escala;
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.75));
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    document.getElementById('foto').addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      document.getElementById('fotoHint').textContent = f ? ('Foto seleccionada: ' + f.name) : '';
+    });
+
+    document.getElementById('formTarea').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!urgenciaSeleccionada) {
+        mostrarToast('Elegí un nivel de urgencia');
+        return;
+      }
+      const btn = document.getElementById('btnEnviar');
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+
+      const datos = {
+        titulo: document.getElementById('titulo').value,
+        ubicacion: document.getElementById('ubicacion').value,
+        urgencia: urgenciaSeleccionada,
+        descripcion: document.getElementById('descripcion').value,
+        reportadoPor: document.getElementById('reportadoPor').value,
+        fotoAntes: null
+      };
+
+      const fotoFile = document.getElementById('foto').files[0];
+      try {
+        if (fotoFile) {
+          datos.fotoAntes = await comprimirImagen(fotoFile);
+        }
+        google.script.run
+          .withSuccessHandler(onExito)
+          .withFailureHandler(onError)
+          .crearTarea(datos);
+      } catch (err) {
+        onError(err);
+      }
+    });
+
+    function onExito(resp) {
+      document.getElementById('formTarea').style.display = 'none';
+      document.getElementById('confirmacion').style.display = 'block';
+      document.getElementById('idGenerado').textContent = 'Ticket ' + resp.id;
+    }
+
+    function onError(err) {
+      const btn = document.getElementById('btnEnviar');
+      btn.disabled = false;
+      btn.textContent = 'Enviar tarea';
+      mostrarToast('Hubo un error: ' + (err.message || err));
+    }
+
+    document.getElementById('btnOtra').addEventListener('click', () => {
+      document.getElementById('formTarea').reset();
+      document.querySelectorAll('#semaforo .opcion').forEach(o => o.classList.remove('selected'));
+      urgenciaSeleccionada = null;
+      document.getElementById('fotoHint').textContent = '';
+      document.getElementById('confirmacion').style.display = 'none';
+      document.getElementById('formTarea').style.display = 'block';
+      const btn = document.getElementById('btnEnviar');
+      btn.disabled = false;
+      btn.textContent = 'Enviar tarea';
+    });
+
+    function mostrarToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.display = 'block';
+      setTimeout(() => t.style.display = 'none', 3500);
+    }
+  </script>
+</body>
+</html>
