@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <h1>Mantenimiento_Miraflores</h1>
+      <span>· panel de tareas</span>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <button class="ghost small" id="btnRefrescar">↻ Actualizar</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="filtros" style="margin-bottom: 8px;">
+      <button class="btn small filtro-urg activo" data-urg="Todas">Todas</button>
+      <button class="btn small filtro-urg" data-urg="Rojo">🔴 Urgente</button>
+      <button class="btn small filtro-urg" data-urg="Amarillo">🟡 Puede esperar</button>
+      <button class="btn small filtro-urg" data-urg="Verde">🟢 Sin apuro</button>
+    </div>
+
+    <div class="board">
+      <section>
+        <div class="col-header">
+          <h2>Pendiente</h2>
+          <span class="count" id="count-Pendiente">0</span>
+        </div>
+        <div id="col-Pendiente"></div>
+      </section>
+      <section>
+        <div class="col-header">
+          <h2>En proceso</h2>
+          <span class="count" id="count-En proceso">0</span>
+        </div>
+        <div id="col-En proceso"></div>
+      </section>
+      <section>
+        <div class="col-header">
+          <h2>Resuelto <span style="font-weight:400; font-size:11px;">(historial)</span></h2>
+          <span class="count" id="count-Resuelto">0</span>
+        </div>
+        <div id="col-Resuelto"></div>
+      </section>
+    </div>
+  </div>
+
+  <div id="modalRoot"></div>
+  <div id="toast" class="toast" style="display:none;"></div>
+
+  <script>
+    let TAREAS = [];
+    let FILTRO_URG = 'Todas';
+
+    function cargarTareas() {
+      google.script.run.withSuccessHandler(onTareas).withFailureHandler(onError).obtenerTareas();
+    }
+
+    function onTareas(tareas) {
+      TAREAS = tareas;
+      render();
+    }
+
+    function onError(err) {
+      mostrarToast('Error cargando datos: ' + (err.message || err));
+    }
+
+    document.querySelectorAll('.filtro-urg').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filtro-urg').forEach(b => b.classList.remove('activo'));
+        btn.classList.add('activo');
+        FILTRO_URG = btn.dataset.urg;
+        render();
+      });
+    });
+    // resalta el filtro activo reutilizando la clase primary
+    const estiloFiltroActivo = document.createElement('style');
+    estiloFiltroActivo.textContent = '.filtro-urg.activo{ background:var(--charcoal); color:var(--paper); }';
+    document.head.appendChild(estiloFiltroActivo);
+
+    document.getElementById('btnRefrescar').addEventListener('click', cargarTareas);
+
+    function render() {
+      const columnas = { 'Pendiente': [], 'En proceso': [], 'Resuelto': [] };
+      TAREAS
+        .filter(t => FILTRO_URG === 'Todas' || t.urgencia === FILTRO_URG)
+        .forEach(t => { if (columnas[t.estado]) columnas[t.estado].push(t); });
+
+      Object.keys(columnas).forEach(estado => {
+        const cont = document.getElementById('col-' + estado);
+        document.getElementById('count-' + estado).textContent = columnas[estado].length;
+        cont.innerHTML = '';
+        if (columnas[estado].length === 0) {
+          cont.innerHTML = '<div class="empty">Nada por acá.</div>';
+          return;
+        }
+        columnas[estado].forEach(t => cont.appendChild(fichaTarea(t)));
+      });
+    }
+
+    function urgenciaClase(u) {
+      return u === 'Rojo' ? 'rojo' : (u === 'Amarillo' ? 'amarillo' : 'verde');
+    }
+
+    function tiempoTranscurrido(fechaISO) {
+      const ms = Date.now() - new Date(fechaISO).getTime();
+      const horas = Math.floor(ms / 3600000);
+      if (horas < 1) return Math.floor(ms / 60000) + 'm';
+      if (horas < 24) return horas + 'h';
+      return Math.floor(horas / 24) + 'd ' + (horas % 24) + 'h';
+    }
+
+    function fichaTarea(t) {
+      const div = document.createElement('div');
+      div.className = 'ticket';
+      const clase = urgenciaClase(t.urgencia);
+      const tiempo = t.estado === 'Resuelto'
+        ? ('Resuelta en ' + t.tiempoResolucion)
+        : ('Abierta hace ' + tiempoTranscurrido(t.fechaCreacion));
+
+      div.innerHTML =
+        '<div class="clip ' + clase + '">' + t.urgencia + '</div>' +
+        '<span class="punch left"></span><span class="punch right"></span>' +
+        '<div class="id mono">' + t.id + '</div>' +
+        '<h3>' + escapeHtml(t.titulo) + '</h3>' +
+        '<div class="meta">' +
+          '<span><b>' + escapeHtml(t.ubicacion) + '</b></span>' +
+          '<span>' + tiempo + '</span>' +
+        '</div>' +
+        '<div class="desc">' + escapeHtml(t.descripcion) + '</div>' +
+        (t.fotoAntes ? '<div class="foto-preview"><img src="' + t.fotoAntes + '"></div>' : '');
+
+      div.addEventListener('click', () => abrirModal(t));
+      return div;
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s || '';
+      return d.innerHTML;
+    }
+
+    /* ---------- MODAL DE DETALLE ---------- */
+    function abrirModal(t) {
+      const root = document.getElementById('modalRoot');
+      const clase = urgenciaClase(t.urgencia);
+      root.innerHTML =
+        '<div class="modal-bg" id="modalBg"><div class="modal">' +
+          '<span class="tag ' + clase + '"><span class="dot"></span>' + t.urgencia + '</span>' +
+          '<h2 style="font-size:17px; margin-top:10px;">' + escapeHtml(t.titulo) + '</h2>' +
+          '<p class="mono" style="font-size:11px; color:var(--ink-soft);">' + t.id + '</p>' +
+          '<p style="font-size:13px;"><b>Ubicación:</b> ' + escapeHtml(t.ubicacion) + '<br>' +
+            '<b>Reportado por:</b> ' + escapeHtml(t.reportadoPor || '—') + '<br>' +
+            '<b>Estado actual:</b> ' + t.estado + '</p>' +
+          '<p style="font-size:13.5px;">' + escapeHtml(t.descripcion) + '</p>' +
+          '<div class="fotos-row">' +
+            (t.fotoAntes ? '<figure><img src="' + t.fotoAntes + '"><figcaption>Antes</figcaption></figure>' : '') +
+            (t.fotoDespues ? '<figure><img src="' + t.fotoDespues + '"><figcaption>Después</figcaption></figure>' : '') +
+          '</div>' +
+          (t.notasResolucion ? '<p style="font-size:13px; margin-top:10px;"><b>Notas:</b> ' + escapeHtml(t.notasResolucion) + '</p>' : '') +
+          '<hr style="border:none; border-top:1px solid var(--steel-dim); margin:16px 0;">' +
+          accionesModal(t) +
+          '<div style="margin-top:14px; text-align:right;">' +
+            '<button class="ghost small" id="btnCerrarModal">Cerrar</button>' +
+          '</div>' +
+        '</div></div>';
+
+      document.getElementById('modalBg').addEventListener('click', (e) => {
+        if (e.target.id === 'modalBg') root.innerHTML = '';
+      });
+      document.getElementById('btnCerrarModal').addEventListener('click', () => root.innerHTML = '');
+
+      if (t.estado === 'Pendiente') {
+        document.getElementById('btnEnProceso').addEventListener('click', () => {
+          cambiarEstado(t.id, 'En proceso', '', null);
+        });
+      }
+      if (t.estado !== 'Resuelto') {
+        document.getElementById('btnResolver').addEventListener('click', () => {
+          const notas = document.getElementById('notasResolucion').value;
+          const fotoFile = document.getElementById('fotoDespues').files[0];
+          const btn = document.getElementById('btnResolver');
+          btn.disabled = true; btn.textContent = 'Guardando...';
+          if (fotoFile) {
+            comprimirImagen(fotoFile).then(b64 => cambiarEstado(t.id, 'Resuelto', notas, b64));
+          } else {
+            cambiarEstado(t.id, 'Resuelto', notas, null);
+          }
+        });
+      }
+    }
+
+    function accionesModal(t) {
+      if (t.estado === 'Resuelto') return '';
+      let html = '<div>';
+      if (t.estado === 'Pendiente') {
+        html += '<button id="btnEnProceso" style="margin-bottom:12px;">Marcar "en proceso"</button>';
+      }
+      html +=
+        '<label>Notas de resolución</label>' +
+        '<textarea id="notasResolucion" placeholder="Qué se hizo, repuestos usados, etc."></textarea>' +
+        '<label>Foto de después (opcional)</label>' +
+        '<input type="file" id="fotoDespues" accept="image/*" capture="environment">' +
+        '<button class="primary" id="btnResolver" style="margin-top:14px; width:100%;">Marcar como resuelto</button>' +
+      '</div>';
+      return html;
+    }
+
+    function cambiarEstado(id, nuevoEstado, notas, fotoDespuesB64) {
+      google.script.run
+        .withSuccessHandler(() => {
+          document.getElementById('modalRoot').innerHTML = '';
+          mostrarToast('Actualizado ✓');
+          cargarTareas();
+        })
+        .withFailureHandler(onError)
+        .actualizarEstado(id, nuevoEstado, notas, fotoDespuesB64);
+    }
+
+    function comprimirImagen(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const maxAncho = 1200;
+            const escala = Math.min(1, maxAncho / img.width);
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width * escala;
+            canvas.height = img.height * escala;
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.75));
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function mostrarToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.display = 'block';
+      setTimeout(() => t.style.display = 'none', 3000);
+    }
+
+    cargarTareas();
+    setInterval(cargarTareas, 60000); // se actualiza solo cada 1 minuto
+  </script>
+</body>
+</html>
