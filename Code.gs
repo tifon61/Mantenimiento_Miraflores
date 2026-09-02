@@ -233,7 +233,9 @@ function guardarFoto_(base64Data, nombreBase) {
   const folder = getFotosFolder_();
   const file = folder.createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  return file.getUrl();
+  // file.getUrl() da la página de "ver archivo" de Drive, no sirve para
+  // un <img>. Esta variante devuelve la imagen directa.
+  return 'https://drive.google.com/uc?export=view&id=' + file.getId();
 }
 
 // Manda un mail cuando entra una tarea roja. Si falla, no rompe la
