@@ -2,11 +2,12 @@
  * ============================================================
  *  MANTENIMIENTO_MIRAFLORES — Backend (Google Apps Script)
  * ============================================================
- * Este archivo es el "cerebro" del sistema. No hace falta
- * base de datos externa: usa una Google Sheet como tabla de
- * datos y una carpeta de Drive para las fotos. Ambas se crean
- * solas la primera vez que alguien usa el sistema, así que no
- * hay que configurar IDs a mano.
+ * Esto es solo la API: recibe pedidos (GET para leer, POST para
+ * escribir), guarda todo en una Google Sheet, sube fotos a Drive
+ * y manda mails de aviso. El formulario y el panel (la parte
+ * visual) viven aparte, en GitHub Pages, y le hablan a esta API
+ * por HTTP. La Sheet y la carpeta de Drive se crean solas la
+ * primera vez que se usa, no hay que configurar IDs a mano.
  */
 
 const NOMBRE_SHEET = 'Tareas';
@@ -16,6 +17,10 @@ const NOMBRE_CARPETA_FOTOS = 'Mantenimiento_Miraflores_Fotos';
 
 // 👉 Cambiá esto por tu mail para recibir avisos de tareas urgentes.
 const MAIL_AVISOS = 'tu-mail@gmail.com';
+
+// 👉 URL del panel en GitHub Pages, para el link que va en los mails
+// de aviso. Si tu usuario/repo de GitHub es otro, ajustá esta línea.
+const PANEL_URL = 'https://tifon61.github.io/Mantenimiento_Miraflores/panel.html';
 
 const ENCABEZADOS = [
   'ID', 'Fecha Creación', 'Título', 'Descripción', 'Ubicación',
@@ -27,23 +32,57 @@ const ENCABEZADOS_PROG = [
   'ID', 'Título', 'Ubicación', 'Urgencia', 'Frecuencia (días)', 'Próxima fecha', 'Última vez hecha'
 ];
 
-/* ======================= ENRUTAMIENTO WEB ======================= */
+/* ======================= ENRUTAMIENTO DE LA API ======================= */
 
-// Se ejecuta cada vez que alguien entra a la URL del Web App.
-// ?page=form  -> formulario público para cargar tareas (por defecto)
-// ?page=panel -> tu panel de gestión
+// Pedidos GET: lecturas. Ej: .../exec?action=tareas
 function doGet(e) {
-  const page = (e && e.parameter && e.parameter.page) || 'form';
-  const template = HtmlService.createTemplateFromFile(page === 'panel' ? 'Panel' : 'Formulario');
-  return template.evaluate()
-    .setTitle('Mantenimiento_Miraflores')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  const action = e && e.parameter && e.parameter.action;
+  try {
+    if (action === 'tareas') return responderJSON_(obtenerTareas());
+    if (action === 'programadas') return responderJSON_(obtenerProgramadas());
+    return responderJSON_({ ok: true, mensaje: 'Mantenimiento_Miraflores API activa' });
+  } catch (err) {
+    return responderJSON_({ ok: false, error: String(err) });
+  }
 }
 
-// Permite incluir Styles.html dentro de los otros HTML con <?!= include('Styles'); ?>
-function include(nombreArchivo) {
-  return HtmlService.createHtmlOutputFromFile(nombreArchivo).getContent();
+// Pedidos POST: escrituras. El cuerpo es JSON: { action: '...', data: {...} }
+// Se manda con Content-Type "text/plain" desde el frontend a propósito,
+// para que el navegador no dispare un preflight de CORS que Apps
+// Script no sabe responder.
+function doPost(e) {
+  try {
+    const cuerpo = JSON.parse(e.postData.contents);
+    const datos = cuerpo.data || {};
+    let resultado;
+
+    switch (cuerpo.action) {
+      case 'crearTarea':
+        resultado = crearTarea(datos);
+        break;
+      case 'actualizarEstado':
+        resultado = actualizarEstado(datos.id, datos.nuevoEstado, datos.notas, datos.fotoDespuesBase64);
+        break;
+      case 'crearProgramada':
+        resultado = crearProgramada(datos);
+        break;
+      case 'completarProgramada':
+        resultado = completarProgramada(datos.id);
+        break;
+      case 'eliminarProgramada':
+        resultado = eliminarProgramada(datos.id);
+        break;
+      default:
+        resultado = { ok: false, error: 'Acción desconocida: ' + cuerpo.action };
+    }
+    return responderJSON_(resultado);
+  } catch (err) {
+    return responderJSON_({ ok: false, error: String(err) });
+  }
+}
+
+function responderJSON_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
 /* ======================= ACCESO A DATOS ======================= */
@@ -112,7 +151,7 @@ function getFotosFolder_() {
   return folder;
 }
 
-/* ============ API llamada desde Formulario.html ============ */
+/* ============ Tareas ============ */
 
 // Crea una tarea nueva. "datos" llega desde el formulario público.
 function crearTarea(datos) {
@@ -179,14 +218,12 @@ function enviarAvisoUrgente_(id, titulo, descripcion, ubicacion) {
         'Título: ' + titulo + '\n' +
         'Ubicación: ' + ubicacion + '\n' +
         'Descripción: ' + descripcion + '\n\n' +
-        'Ver en el panel: ' + ScriptApp.getService().getUrl() + '?page=panel'
+        'Ver en el panel: ' + PANEL_URL
     });
   } catch (err) {
     console.error('No se pudo enviar el aviso: ' + err);
   }
 }
-
-/* ============ API llamada desde Panel.html ============ */
 
 // Devuelve todas las tareas, más nuevas primero.
 function obtenerTareas() {
@@ -364,6 +401,6 @@ function revisarProgramadas_() {
   MailApp.sendEmail({
     to: MAIL_AVISOS,
     subject: '🔁 Tareas periódicas de mantenimiento vencidas',
-    body: 'Estas tareas de rutina ya tocan:\n\n' + lista + '\n\nVer panel: ' + ScriptApp.getService().getUrl() + '?page=panel'
+    body: 'Estas tareas de rutina ya tocan:\n\n' + lista + '\n\nVer panel: ' + PANEL_URL
   });
 }
