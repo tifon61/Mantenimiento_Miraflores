@@ -1,8 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-  <base target="_top">
-  <?!= include('Styles'); ?>
+<meta charset="UTF-8">
+<title>Mantenimiento_Miraflores — Panel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div class="topbar">
@@ -11,7 +13,7 @@
       <span>· panel de tareas</span>
     </div>
     <div style="display:flex; gap:10px; align-items:center;">
-      <a class="btn ghost small" href="<?= ScriptApp.getService().getUrl() ?>">+ Cargar tarea</a>
+      <a class="btn ghost small" href="index.html">+ Cargar tarea</a>
       <button class="ghost small" id="btnRefrescar">↻ Actualizar</button>
     </div>
   </div>
@@ -58,13 +60,28 @@
   <div id="modalRoot"></div>
   <div id="toast" class="toast" style="display:none;"></div>
 
+  <script src="config.js"></script>
   <script>
     let TAREAS = [];
     let PROGRAMADAS = [];
     let FILTRO_URG = 'Todas';
 
+    // Llama a la API de Apps Script para escrituras (POST). Content-Type
+    // "text/plain" a propósito, para que el navegador no dispare un
+    // preflight de CORS antes del pedido.
+    function llamarAPI(action, data) {
+      return fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action, data })
+      }).then(r => r.json());
+    }
+
     function cargarTareas() {
-      google.script.run.withSuccessHandler(onTareas).withFailureHandler(onError).obtenerTareas();
+      fetch(API_URL + '?action=tareas')
+        .then(r => r.json())
+        .then(onTareas)
+        .catch(onError);
     }
 
     function onTareas(tareas) {
@@ -153,7 +170,10 @@
 
     /* ---------- TAREAS PERIÓDICAS ---------- */
     function cargarProgramadas() {
-      google.script.run.withSuccessHandler(onProgramadas).withFailureHandler(onError).obtenerProgramadas();
+      fetch(API_URL + '?action=programadas')
+        .then(r => r.json())
+        .then(onProgramadas)
+        .catch(onError);
     }
 
     function onProgramadas(lista) {
@@ -197,13 +217,12 @@
     }
 
     function completarProgramada(id) {
-      google.script.run
-        .withSuccessHandler(() => {
+      llamarAPI('completarProgramada', { id })
+        .then(() => {
           mostrarToast('Marcada como hecha ✓');
           cargarProgramadas();
         })
-        .withFailureHandler(onError)
-        .completarProgramada(id);
+        .catch(onError);
     }
 
     document.getElementById('btnNuevaProgramada').addEventListener('click', abrirModalNuevaProgramada);
@@ -247,14 +266,13 @@
           frecuenciaDias: document.getElementById('progFrecuencia').value,
           urgencia: document.getElementById('progUrgencia').value
         };
-        google.script.run
-          .withSuccessHandler(() => {
+        llamarAPI('crearProgramada', datos)
+          .then(() => {
             root.innerHTML = '';
             mostrarToast('Tarea periódica creada ✓');
             cargarProgramadas();
           })
-          .withFailureHandler(onError)
-          .crearProgramada(datos);
+          .catch(onError);
       });
     }
 
@@ -325,14 +343,13 @@
     }
 
     function cambiarEstado(id, nuevoEstado, notas, fotoDespuesB64) {
-      google.script.run
-        .withSuccessHandler(() => {
+      llamarAPI('actualizarEstado', { id, nuevoEstado, notas, fotoDespuesBase64: fotoDespuesB64 })
+        .then(() => {
           document.getElementById('modalRoot').innerHTML = '';
           mostrarToast('Actualizado ✓');
           cargarTareas();
         })
-        .withFailureHandler(onError)
-        .actualizarEstado(id, nuevoEstado, notas, fotoDespuesB64);
+        .catch(onError);
     }
 
     function comprimirImagen(file) {
