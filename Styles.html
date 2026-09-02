@@ -92,9 +92,11 @@
   button:hover, .btn:hover{ box-shadow: 3px 3px 0 var(--steel-dim); transform: translate(-1px,-1px); }
   button:active, .btn:active{ transform: translate(0,0); box-shadow:none; }
   button:disabled{ opacity:.5; cursor:not-allowed; transform:none; box-shadow:none; }
-  button.primary{ background: var(--charcoal); color: var(--paper); }
-  button.ghost{ background: transparent; }
-  button.small{ padding: 6px 12px; font-size: 12px; }
+  button.primary, .btn.primary{ background: var(--charcoal); color: var(--paper); }
+  button.ghost, .btn.ghost{ background: transparent; }
+  button.small, .btn.small{ padding: 6px 12px; font-size: 12px; }
+  a.btn{ display:inline-block; text-decoration:none; }
+  .topbar .ghost{ color: var(--paper); border-color: var(--steel-dim); }
 
   @media (prefers-reduced-motion: reduce){
     *{ transition: none !important; animation: none !important; }
