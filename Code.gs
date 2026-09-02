@@ -234,8 +234,9 @@ function guardarFoto_(base64Data, nombreBase) {
   const file = folder.createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   // file.getUrl() da la página de "ver archivo" de Drive, no sirve para
-  // un <img>. Esta variante devuelve la imagen directa.
-  return 'https://drive.google.com/uc?export=view&id=' + file.getId();
+  // un <img>. El endpoint de thumbnail es el que Google sostiene para
+  // insertar imágenes de Drive en otras páginas.
+  return 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w1000';
 }
 
 // Manda un mail cuando entra una tarea roja. Si falla, no rompe la
