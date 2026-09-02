@@ -231,6 +231,38 @@
 
   .filtros{ display:flex; gap:8px; flex-wrap:wrap; }
 
+  /* ---------- Tareas periódicas ---------- */
+  .periodicas-header{
+    display:flex; align-items:center; justify-content:space-between;
+    margin: 4px 0 10px;
+  }
+  .periodicas-header h2{ font-size: 14px; color: var(--charcoal); }
+  .periodicas-scroll{
+    display:flex; gap:12px; overflow-x:auto; padding-bottom: 8px; margin-bottom: 20px;
+  }
+  .prog-card{
+    flex: 0 0 210px;
+    background: var(--paper);
+    border: 1px solid var(--paper-dim);
+    border-radius: var(--radius);
+    padding: 12px 14px 14px;
+    border-left: 5px solid var(--steel-dim);
+  }
+  .prog-card.vencida{ border-left-color: var(--rojo); }
+  .prog-card.proxima{ border-left-color: var(--ambar); }
+  .prog-card.ok{ border-left-color: var(--verde); }
+  .prog-card h4{ font-size: 13.5px; margin:0 0 4px; font-weight:600; color: var(--ink); }
+  .prog-card .prog-ubi{ font-size: 11.5px; color: var(--ink-soft); margin-bottom:8px; }
+  .prog-card .prog-tiempo{
+    font-family: var(--font-mono); font-size: 11px; font-weight:600;
+    padding: 3px 9px; border-radius: 20px; display:inline-block;
+  }
+  .prog-card.vencida .prog-tiempo{ background: var(--rojo-bg); color:#8C2A2A; }
+  .prog-card.proxima .prog-tiempo{ background: var(--ambar-bg); color:#8C6216; }
+  .prog-card.ok .prog-tiempo{ background: var(--verde-bg); color:#276645; }
+  .prog-card button{ margin-top:10px; width:100%; }
+  .prog-empty{ font-size:12.5px; color:var(--ink-soft); }
+
   /* ---------- Modal ---------- */
   .modal-bg{
     position: fixed; inset:0; background: rgba(36,38,43,.55);

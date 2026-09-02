@@ -10,6 +10,7 @@
  */
 
 const NOMBRE_SHEET = 'Tareas';
+const NOMBRE_SHEET_PROG = 'Programadas';
 const NOMBRE_DB = 'Mantenimiento_Miraflores_DB';
 const NOMBRE_CARPETA_FOTOS = 'Mantenimiento_Miraflores_Fotos';
 
@@ -20,6 +21,10 @@ const ENCABEZADOS = [
   'ID', 'Fecha Creación', 'Título', 'Descripción', 'Ubicación',
   'Urgencia', 'Estado', 'Reportado por', 'Foto Antes', 'Foto Después',
   'Fecha Inicio', 'Fecha Resolución', 'Tiempo Resolución', 'Notas Resolución'
+];
+
+const ENCABEZADOS_PROG = [
+  'ID', 'Título', 'Ubicación', 'Urgencia', 'Frecuencia (días)', 'Próxima fecha', 'Última vez hecha'
 ];
 
 /* ======================= ENRUTAMIENTO WEB ======================= */
@@ -43,9 +48,9 @@ function include(nombreArchivo) {
 
 /* ======================= ACCESO A DATOS ======================= */
 
-// Devuelve la hoja de cálculo "Tareas", creándola (junto con el
-// spreadsheet que la contiene) si es la primera vez que se usa.
-function getDB_() {
+// Devuelve el spreadsheet que hace de base de datos, creándolo si
+// es la primera vez que se usa.
+function getSpreadsheet_() {
   const props = PropertiesService.getScriptProperties();
   let id = props.getProperty('DB_ID');
   let ss;
@@ -56,6 +61,13 @@ function getDB_() {
     ss = SpreadsheetApp.create(NOMBRE_DB);
     props.setProperty('DB_ID', ss.getId());
   }
+  return ss;
+}
+
+// Devuelve la hoja de cálculo "Tareas", creándola si es la primera
+// vez que se usa.
+function getDB_() {
+  const ss = getSpreadsheet_();
   let sheet = ss.getSheetByName(NOMBRE_SHEET);
   if (!sheet) {
     sheet = ss.insertSheet(NOMBRE_SHEET);
@@ -68,6 +80,20 @@ function getDB_() {
     const hojaDefault = ss.getSheetByName(nombre);
     if (hojaDefault) ss.deleteSheet(hojaDefault);
   });
+  return sheet;
+}
+
+// Devuelve la hoja de cálculo "Programadas" (tareas periódicas, tipo
+// "limpiar canaletas cada 90 días"), creándola si es la primera vez.
+function getDBProgramadas_() {
+  const ss = getSpreadsheet_();
+  let sheet = ss.getSheetByName(NOMBRE_SHEET_PROG);
+  if (!sheet) {
+    sheet = ss.insertSheet(NOMBRE_SHEET_PROG);
+    sheet.appendRow(ENCABEZADOS_PROG);
+    sheet.setFrozenRows(1);
+    sheet.autoResizeColumns(1, ENCABEZADOS_PROG.length);
+  }
   return sheet;
 }
 
@@ -235,4 +261,109 @@ function formatearDuracion_(ms) {
   }
   const minutos = Math.floor((ms % 3600000) / 60000);
   return horas + 'h ' + minutos + 'm';
+}
+
+/* ============ Tareas periódicas (limpiar canaletas, desagües, etc.) ============ */
+//
+// A diferencia de las tareas normales (que reporta el personal cuando
+// pasa algo), estas se cargan una sola vez con una frecuencia en días
+// y el sistema calcula solo cuánto falta para la próxima. Al marcarlas
+// "hecha" se reinicia el conteo automáticamente.
+
+// Crea una tarea periódica nueva. "datos" = {titulo, ubicacion, urgencia, frecuenciaDias}
+function crearProgramada(datos) {
+  const sheet = getDBProgramadas_();
+  const id = 'P-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyMMdd-HHmmss');
+  const frecuencia = Number(datos.frecuenciaDias) || 30;
+  const proxima = new Date();
+  proxima.setDate(proxima.getDate() + frecuencia);
+
+  sheet.appendRow([
+    id, datos.titulo, datos.ubicacion, datos.urgencia || 'Amarillo',
+    frecuencia, proxima, ''
+  ]);
+  return { ok: true, id: id };
+}
+
+// Devuelve las tareas periódicas con los días que faltan (o que pasaron,
+// en negativo, si está vencida) para la próxima, ordenadas de la más
+// urgente a la que menos apura.
+function obtenerProgramadas() {
+  const sheet = getDBProgramadas_();
+  const datos = sheet.getDataRange().getValues();
+  datos.shift();
+  const hoy = new Date();
+
+  return datos.map(fila => {
+    const proxima = new Date(fila[5]);
+    const diasRestantes = Math.ceil((proxima.getTime() - hoy.getTime()) / 86400000);
+    return {
+      id: fila[0],
+      titulo: fila[1],
+      ubicacion: fila[2],
+      urgencia: fila[3],
+      frecuenciaDias: fila[4],
+      proximaFecha: proxima.toISOString(),
+      ultimaVezHecha: fila[6] ? new Date(fila[6]).toISOString() : '',
+      diasRestantes: diasRestantes
+    };
+  }).sort((a, b) => a.diasRestantes - b.diasRestantes);
+}
+
+// Marca una tarea periódica como hecha hoy: reinicia el conteo sumando
+// la frecuencia desde la fecha actual.
+function completarProgramada(id) {
+  const sheet = getDBProgramadas_();
+  const datos = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < datos.length; i++) {
+    if (datos[i][0] === id) {
+      const fila = i + 1;
+      const ahora = new Date();
+      const frecuencia = Number(datos[i][4]) || 30;
+      const proxima = new Date();
+      proxima.setDate(proxima.getDate() + frecuencia);
+
+      sheet.getRange(fila, 6).setValue(proxima); // columna F: Próxima fecha
+      sheet.getRange(fila, 7).setValue(ahora);   // columna G: Última vez hecha
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'No se encontró la tarea periódica ' + id };
+}
+
+// Borra una tarea periódica (por ejemplo si se cargó por error).
+function eliminarProgramada(id) {
+  const sheet = getDBProgramadas_();
+  const datos = sheet.getDataRange().getValues();
+  for (let i = 1; i < datos.length; i++) {
+    if (datos[i][0] === id) {
+      sheet.deleteRow(i + 1);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'No se encontró la tarea periódica ' + id };
+}
+
+// Manda un mail-resumen si hay tareas periódicas vencidas. No se
+// ejecuta sola: hay que activarla una vez como disparador (trigger).
+//
+// 👉 Para activarla: en el editor de Apps Script, abrí el reloj ⏰
+// "Disparadores" del menú izquierdo → "+ Agregar disparador" → función
+// "revisarProgramadas_" → origen del evento "Basado en tiempo" →
+// "Temporizador de día" → elegí un horario (ej: 8 a 9 de la mañana) →
+// Guardar. A partir de ahí se revisa solo todos los días.
+function revisarProgramadas_() {
+  const vencidas = obtenerProgramadas().filter(p => p.diasRestantes <= 0);
+  if (vencidas.length === 0 || !MAIL_AVISOS) return;
+
+  const lista = vencidas
+    .map(p => '• ' + p.titulo + ' (' + p.ubicacion + ') — vencida hace ' + Math.abs(p.diasRestantes) + ' día(s)')
+    .join('\n');
+
+  MailApp.sendEmail({
+    to: MAIL_AVISOS,
+    subject: '🔁 Tareas periódicas de mantenimiento vencidas',
+    body: 'Estas tareas de rutina ya tocan:\n\n' + lista + '\n\nVer panel: ' + ScriptApp.getService().getUrl() + '?page=panel'
+  });
 }
