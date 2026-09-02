@@ -11,11 +11,18 @@
       <span>· panel de tareas</span>
     </div>
     <div style="display:flex; gap:10px; align-items:center;">
+      <a class="btn ghost small" href="<?= ScriptApp.getService().getUrl() ?>">+ Cargar tarea</a>
       <button class="ghost small" id="btnRefrescar">↻ Actualizar</button>
     </div>
   </div>
 
   <div class="wrap">
+    <div class="periodicas-header">
+      <h2>🔁 Tareas periódicas</h2>
+      <button class="ghost small" id="btnNuevaProgramada">+ Nueva</button>
+    </div>
+    <div class="periodicas-scroll" id="listaProgramadas"></div>
+
     <div class="filtros" style="margin-bottom: 8px;">
       <button class="btn small filtro-urg activo" data-urg="Todas">Todas</button>
       <button class="btn small filtro-urg" data-urg="Rojo">🔴 Urgente</button>
@@ -53,6 +60,7 @@
 
   <script>
     let TAREAS = [];
+    let PROGRAMADAS = [];
     let FILTRO_URG = 'Todas';
 
     function cargarTareas() {
@@ -141,6 +149,113 @@
       const d = document.createElement('div');
       d.textContent = s || '';
       return d.innerHTML;
+    }
+
+    /* ---------- TAREAS PERIÓDICAS ---------- */
+    function cargarProgramadas() {
+      google.script.run.withSuccessHandler(onProgramadas).withFailureHandler(onError).obtenerProgramadas();
+    }
+
+    function onProgramadas(lista) {
+      PROGRAMADAS = lista;
+      renderProgramadas();
+    }
+
+    function claseProgramada(dias) {
+      if (dias <= 0) return 'vencida';
+      if (dias <= 7) return 'proxima';
+      return 'ok';
+    }
+
+    function textoProgramada(dias) {
+      if (dias < 0) return 'Vencida hace ' + Math.abs(dias) + 'd';
+      if (dias === 0) return 'Vence hoy';
+      return 'Faltan ' + dias + 'd';
+    }
+
+    function renderProgramadas() {
+      const cont = document.getElementById('listaProgramadas');
+      cont.innerHTML = '';
+      if (PROGRAMADAS.length === 0) {
+        cont.innerHTML = '<div class="prog-empty">Todavía no cargaste tareas periódicas. Tocá "+ Nueva" para agregar, por ejemplo, "Limpiar canaletas" cada 90 días.</div>';
+        return;
+      }
+      PROGRAMADAS.forEach(p => cont.appendChild(fichaProgramada(p)));
+    }
+
+    function fichaProgramada(p) {
+      const div = document.createElement('div');
+      const clase = claseProgramada(p.diasRestantes);
+      div.className = 'prog-card ' + clase;
+      div.innerHTML =
+        '<h4>' + escapeHtml(p.titulo) + '</h4>' +
+        '<div class="prog-ubi">' + escapeHtml(p.ubicacion) + ' · cada ' + p.frecuenciaDias + ' días</div>' +
+        '<span class="prog-tiempo">' + textoProgramada(p.diasRestantes) + '</span>' +
+        '<button class="small">✓ Marcar hecha</button>';
+      div.querySelector('button').addEventListener('click', () => completarProgramada(p.id));
+      return div;
+    }
+
+    function completarProgramada(id) {
+      google.script.run
+        .withSuccessHandler(() => {
+          mostrarToast('Marcada como hecha ✓');
+          cargarProgramadas();
+        })
+        .withFailureHandler(onError)
+        .completarProgramada(id);
+    }
+
+    document.getElementById('btnNuevaProgramada').addEventListener('click', abrirModalNuevaProgramada);
+
+    function abrirModalNuevaProgramada() {
+      const root = document.getElementById('modalRoot');
+      root.innerHTML =
+        '<div class="modal-bg" id="modalBg"><div class="modal">' +
+          '<h2 style="font-size:17px;">Nueva tarea periódica</h2>' +
+          '<label>Título</label>' +
+          '<input type="text" id="progTitulo" placeholder="Ej: Limpiar canaletas">' +
+          '<label>Ubicación</label>' +
+          '<select id="progUbicacion">' +
+            '<option>Cocina</option><option>Salón</option><option>Baño</option>' +
+            '<option>Barra</option><option>Depósito</option><option>Exterior</option><option>Otro</option>' +
+          '</select>' +
+          '<label>Cada cuánto (en días)</label>' +
+          '<input type="number" id="progFrecuencia" value="30" min="1">' +
+          '<div class="hint">Ej: 7 = semanal, 30 = mensual, 90 = trimestral, 180 = semestral, 365 = anual.</div>' +
+          '<label>Urgencia cuando venza</label>' +
+          '<select id="progUrgencia">' +
+            '<option value="Amarillo">🟡 Puede esperar</option>' +
+            '<option value="Rojo">🔴 Urgente</option>' +
+            '<option value="Verde">🟢 Sin apuro</option>' +
+          '</select>' +
+          '<button class="primary" id="btnGuardarProgramada" style="margin-top:14px; width:100%;">Guardar</button>' +
+          '<div style="margin-top:10px; text-align:right;"><button class="ghost small" id="btnCerrarModal">Cerrar</button></div>' +
+        '</div></div>';
+
+      document.getElementById('modalBg').addEventListener('click', (e) => {
+        if (e.target.id === 'modalBg') root.innerHTML = '';
+      });
+      document.getElementById('btnCerrarModal').addEventListener('click', () => root.innerHTML = '');
+
+      document.getElementById('btnGuardarProgramada').addEventListener('click', () => {
+        const titulo = document.getElementById('progTitulo').value.trim();
+        if (!titulo) { mostrarToast('Ponele un título'); return; }
+        const datos = {
+          titulo: titulo,
+          ubicacion: document.getElementById('progUbicacion').value,
+          frecuenciaDias: document.getElementById('progFrecuencia').value,
+          urgencia: document.getElementById('progUrgencia').value
+        };
+        google.script.run
+          .withSuccessHandler(() => {
+            root.innerHTML = '';
+            mostrarToast('Tarea periódica creada ✓');
+            cargarProgramadas();
+          })
+          .withFailureHandler(onError)
+          .crearProgramada(datos);
+      });
     }
 
     /* ---------- MODAL DE DETALLE ---------- */
@@ -250,7 +365,9 @@
     }
 
     cargarTareas();
+    cargarProgramadas();
     setInterval(cargarTareas, 60000); // se actualiza solo cada 1 minuto
+    setInterval(cargarProgramadas, 60000);
   </script>
 </body>
 </html>
