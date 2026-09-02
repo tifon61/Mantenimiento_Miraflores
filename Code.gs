@@ -66,8 +66,17 @@ function doPost(e) {
       case 'actualizarEstado':
         resultado = actualizarEstado(datos.id, datos.nuevoEstado, datos.notas, datos.fotoDespuesBase64);
         break;
+      case 'editarTarea':
+        resultado = editarTarea(datos);
+        break;
+      case 'eliminarTarea':
+        resultado = eliminarTarea(datos.id);
+        break;
       case 'crearProgramada':
         resultado = crearProgramada(datos);
+        break;
+      case 'editarProgramada':
+        resultado = editarProgramada(datos);
         break;
       case 'completarProgramada':
         resultado = completarProgramada(datos.id);
@@ -330,6 +339,38 @@ function actualizarEstado(id, nuevoEstado, notas, fotoDespuesBase64) {
   return { ok: false, error: 'No se encontró la tarea ' + id };
 }
 
+// Edita los datos básicos de una tarea (título, descripción, ubicación,
+// urgencia). No toca el estado ni las fechas — eso lo maneja
+// actualizarEstado. "datos" = {id, titulo, descripcion, ubicacion, urgencia}
+function editarTarea(datos) {
+  const sheet = getDB_();
+  const filas = sheet.getDataRange().getValues();
+  for (let i = 1; i < filas.length; i++) {
+    if (filas[i][0] === datos.id) {
+      const fila = i + 1;
+      if (datos.titulo !== undefined) sheet.getRange(fila, 3).setValue(datos.titulo);
+      if (datos.descripcion !== undefined) sheet.getRange(fila, 4).setValue(datos.descripcion);
+      if (datos.ubicacion !== undefined) sheet.getRange(fila, 5).setValue(datos.ubicacion);
+      if (datos.urgencia !== undefined) sheet.getRange(fila, 6).setValue(datos.urgencia);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'No se encontró la tarea ' + datos.id };
+}
+
+// Borra una tarea por completo (por ejemplo si se cargó duplicada o por error).
+function eliminarTarea(id) {
+  const sheet = getDB_();
+  const filas = sheet.getDataRange().getValues();
+  for (let i = 1; i < filas.length; i++) {
+    if (filas[i][0] === id) {
+      sheet.deleteRow(i + 1);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'No se encontró la tarea ' + id };
+}
+
 // Convierte milisegundos en algo legible: "2d 4h" o "3h 15m"
 function formatearDuracion_(ms) {
   const horas = Math.floor(ms / 3600000);
@@ -361,6 +402,33 @@ function crearProgramada(datos) {
     frecuencia, proxima, ''
   ]);
   return { ok: true, id: id };
+}
+
+// Edita una tarea periódica (título, ubicación, urgencia, frecuencia).
+// Si cambia la frecuencia, recalcula la próxima fecha a partir de la
+// última vez hecha (o de ahora, si nunca se hizo).
+// "datos" = {id, titulo, ubicacion, urgencia, frecuenciaDias}
+function editarProgramada(datos) {
+  const sheet = getDBProgramadas_();
+  const filas = sheet.getDataRange().getValues();
+  for (let i = 1; i < filas.length; i++) {
+    if (filas[i][0] === datos.id) {
+      const fila = i + 1;
+      if (datos.titulo !== undefined) sheet.getRange(fila, 2).setValue(datos.titulo);
+      if (datos.ubicacion !== undefined) sheet.getRange(fila, 3).setValue(datos.ubicacion);
+      if (datos.urgencia !== undefined) sheet.getRange(fila, 4).setValue(datos.urgencia);
+      if (datos.frecuenciaDias !== undefined) {
+        const frecuencia = Number(datos.frecuenciaDias) || 30;
+        const base = filas[i][6] ? new Date(filas[i][6]) : new Date();
+        const proxima = new Date(base);
+        proxima.setDate(proxima.getDate() + frecuencia);
+        sheet.getRange(fila, 5).setValue(frecuencia);
+        sheet.getRange(fila, 6).setValue(proxima);
+      }
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'No se encontró la tarea periódica ' + datos.id };
 }
 
 // Devuelve las tareas periódicas con los días que faltan (o que pasaron,

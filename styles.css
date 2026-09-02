@@ -264,7 +264,8 @@ input:focus, textarea:focus, select:focus{ outline: 2px solid var(--steel); outl
 .prog-card.vencida .prog-tiempo{ background: var(--rojo-bg); color:#8C2A2A; }
 .prog-card.proxima .prog-tiempo{ background: var(--ambar-bg); color:#8C6216; }
 .prog-card.ok .prog-tiempo{ background: var(--verde-bg); color:#276645; }
-.prog-card button{ margin-top:10px; width:100%; }
+.prog-acciones{ display:flex; gap:6px; margin-top:10px; }
+.prog-acciones button{ flex:1; }
 .prog-empty{ font-size:12.5px; color:var(--ink-soft); }
 
 /* ---------- Modal ---------- */

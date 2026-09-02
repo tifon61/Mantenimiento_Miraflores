@@ -169,6 +169,19 @@
       return d.innerHTML;
     }
 
+    const UBICACIONES = ['Cocina', 'Salón', 'Baño', 'Barra', 'Depósito', 'Exterior', 'Otro'];
+    const URGENCIAS = [['Amarillo', '🟡 Puede esperar'], ['Rojo', '🔴 Urgente'], ['Verde', '🟢 Sin apuro']];
+
+    function opcionesUbicacion(actual) {
+      return UBICACIONES.map(u => '<option' + (u === actual ? ' selected' : '') + '>' + u + '</option>').join('');
+    }
+
+    function opcionesUrgencia(actual) {
+      return URGENCIAS.map(([valor, etiqueta]) =>
+        '<option value="' + valor + '"' + (valor === actual ? ' selected' : '') + '>' + etiqueta + '</option>'
+      ).join('');
+    }
+
     /* ---------- TAREAS PERIÓDICAS ---------- */
     function cargarProgramadas() {
       fetch(API_URL + '?action=programadas')
@@ -212,8 +225,12 @@
         '<h4>' + escapeHtml(p.titulo) + '</h4>' +
         '<div class="prog-ubi">' + escapeHtml(p.ubicacion) + ' · cada ' + p.frecuenciaDias + ' días</div>' +
         '<span class="prog-tiempo">' + textoProgramada(p.diasRestantes) + '</span>' +
-        '<button class="small">✓ Marcar hecha</button>';
-      div.querySelector('button').addEventListener('click', () => completarProgramada(p.id));
+        '<div class="prog-acciones">' +
+          '<button class="small btn-hecha">✓ Hecha</button>' +
+          '<button class="ghost small btn-editar-prog">✏️</button>' +
+        '</div>';
+      div.querySelector('.btn-hecha').addEventListener('click', () => completarProgramada(p.id));
+      div.querySelector('.btn-editar-prog').addEventListener('click', () => abrirModalProgramada(p));
       return div;
     }
 
@@ -226,32 +243,35 @@
         .catch(onError);
     }
 
-    document.getElementById('btnNuevaProgramada').addEventListener('click', abrirModalNuevaProgramada);
+    document.getElementById('btnNuevaProgramada').addEventListener('click', () => abrirModalProgramada());
 
-    function abrirModalNuevaProgramada() {
+    // Sin argumento: modal de alta. Con "p": modal de edición de esa tarea.
+    function abrirModalProgramada(p) {
+      const esEdicion = !!p;
       const root = document.getElementById('modalRoot');
       root.innerHTML =
         '<div class="modal-bg" id="modalBg"><div class="modal">' +
-          '<h2 style="font-size:17px;">Nueva tarea periódica</h2>' +
+          '<h2 style="font-size:17px;">' + (esEdicion ? 'Editar tarea periódica' : 'Nueva tarea periódica') + '</h2>' +
           '<label>Título</label>' +
           '<input type="text" id="progTitulo" placeholder="Ej: Limpiar canaletas">' +
           '<label>Ubicación</label>' +
-          '<select id="progUbicacion">' +
-            '<option>Cocina</option><option>Salón</option><option>Baño</option>' +
-            '<option>Barra</option><option>Depósito</option><option>Exterior</option><option>Otro</option>' +
-          '</select>' +
+          '<select id="progUbicacion">' + opcionesUbicacion(esEdicion ? p.ubicacion : null) + '</select>' +
           '<label>Cada cuánto (en días)</label>' +
-          '<input type="number" id="progFrecuencia" value="30" min="1">' +
+          '<input type="number" id="progFrecuencia" min="1">' +
           '<div class="hint">Ej: 7 = semanal, 30 = mensual, 90 = trimestral, 180 = semestral, 365 = anual.</div>' +
           '<label>Urgencia cuando venza</label>' +
-          '<select id="progUrgencia">' +
-            '<option value="Amarillo">🟡 Puede esperar</option>' +
-            '<option value="Rojo">🔴 Urgente</option>' +
-            '<option value="Verde">🟢 Sin apuro</option>' +
-          '</select>' +
-          '<button class="primary" id="btnGuardarProgramada" style="margin-top:14px; width:100%;">Guardar</button>' +
+          '<select id="progUrgencia">' + opcionesUrgencia(esEdicion ? p.urgencia : 'Amarillo') + '</select>' +
+          '<button class="primary" id="btnGuardarProgramada" style="margin-top:14px; width:100%;">' +
+            (esEdicion ? 'Guardar cambios' : 'Guardar') +
+          '</button>' +
+          (esEdicion
+            ? '<button class="ghost small" id="btnEliminarProgramada" style="margin-top:10px; width:100%; color:var(--rojo); border-color:var(--rojo);">🗑 Eliminar</button>'
+            : '') +
           '<div style="margin-top:10px; text-align:right;"><button class="ghost small" id="btnCerrarModal">Cerrar</button></div>' +
         '</div></div>';
+
+      document.getElementById('progTitulo').value = esEdicion ? p.titulo : '';
+      document.getElementById('progFrecuencia').value = esEdicion ? p.frecuenciaDias : 30;
 
       document.getElementById('modalBg').addEventListener('click', (e) => {
         if (e.target.id === 'modalBg') root.innerHTML = '';
@@ -267,14 +287,28 @@
           frecuenciaDias: document.getElementById('progFrecuencia').value,
           urgencia: document.getElementById('progUrgencia').value
         };
-        llamarAPI('crearProgramada', datos)
+        if (esEdicion) datos.id = p.id;
+        llamarAPI(esEdicion ? 'editarProgramada' : 'crearProgramada', datos)
           .then(() => {
             root.innerHTML = '';
-            mostrarToast('Tarea periódica creada ✓');
+            mostrarToast(esEdicion ? 'Cambios guardados ✓' : 'Tarea periódica creada ✓');
             cargarProgramadas();
           })
           .catch(onError);
       });
+
+      if (esEdicion) {
+        document.getElementById('btnEliminarProgramada').addEventListener('click', () => {
+          if (!confirm('¿Eliminar "' + p.titulo + '"? No se puede deshacer.')) return;
+          llamarAPI('eliminarProgramada', { id: p.id })
+            .then(() => {
+              root.innerHTML = '';
+              mostrarToast('Eliminada');
+              cargarProgramadas();
+            })
+            .catch(onError);
+        });
+      }
     }
 
     /* ---------- MODAL DE DETALLE ---------- */
@@ -295,6 +329,11 @@
             (t.fotoDespues ? '<figure><img src="' + t.fotoDespues + '"><figcaption>Después</figcaption></figure>' : '') +
           '</div>' +
           (t.notasResolucion ? '<p style="font-size:13px; margin-top:10px;"><b>Notas:</b> ' + escapeHtml(t.notasResolucion) + '</p>' : '') +
+          '<div style="margin-top:12px; display:flex; gap:8px;">' +
+            '<button class="ghost small" id="btnEditarTarea">✏️ Editar</button>' +
+            '<button class="ghost small" id="btnEliminarTarea" style="color:var(--rojo); border-color:var(--rojo);">🗑 Eliminar</button>' +
+          '</div>' +
+          '<div id="formEditarTarea" style="display:none; margin-top:12px;"></div>' +
           '<hr style="border:none; border-top:1px solid var(--steel-dim); margin:16px 0;">' +
           accionesModal(t) +
           '<div style="margin-top:14px; text-align:right;">' +
@@ -306,6 +345,48 @@
         if (e.target.id === 'modalBg') root.innerHTML = '';
       });
       document.getElementById('btnCerrarModal').addEventListener('click', () => root.innerHTML = '');
+
+      document.getElementById('btnEditarTarea').addEventListener('click', () => {
+        const cont = document.getElementById('formEditarTarea');
+        if (cont.style.display !== 'none') { cont.style.display = 'none'; cont.innerHTML = ''; return; }
+        cont.style.display = 'block';
+        cont.innerHTML =
+          '<label>Título</label><input type="text" id="editTitulo">' +
+          '<label>Ubicación</label><select id="editUbicacion">' + opcionesUbicacion(t.ubicacion) + '</select>' +
+          '<label>Urgencia</label><select id="editUrgencia">' + opcionesUrgencia(t.urgencia) + '</select>' +
+          '<label>Descripción</label><textarea id="editDescripcion"></textarea>' +
+          '<button class="primary small" id="btnGuardarEdicion" style="margin-top:10px; width:100%;">Guardar cambios</button>';
+        document.getElementById('editTitulo').value = t.titulo;
+        document.getElementById('editDescripcion').value = t.descripcion;
+
+        document.getElementById('btnGuardarEdicion').addEventListener('click', () => {
+          const datos = {
+            id: t.id,
+            titulo: document.getElementById('editTitulo').value,
+            ubicacion: document.getElementById('editUbicacion').value,
+            urgencia: document.getElementById('editUrgencia').value,
+            descripcion: document.getElementById('editDescripcion').value
+          };
+          llamarAPI('editarTarea', datos)
+            .then(() => {
+              root.innerHTML = '';
+              mostrarToast('Actualizado ✓');
+              cargarTareas();
+            })
+            .catch(onError);
+        });
+      });
+
+      document.getElementById('btnEliminarTarea').addEventListener('click', () => {
+        if (!confirm('¿Eliminar esta tarea? No se puede deshacer.')) return;
+        llamarAPI('eliminarTarea', { id: t.id })
+          .then(() => {
+            root.innerHTML = '';
+            mostrarToast('Eliminada');
+            cargarTareas();
+          })
+          .catch(onError);
+      });
 
       if (t.estado === 'Pendiente') {
         document.getElementById('btnEnProceso').addEventListener('click', () => {
