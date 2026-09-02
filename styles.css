@@ -1,20 +1,22 @@
 /* ======================================================
    MANTENIMIENTO_MIRAFLORES — Tokens de diseño
-   Concepto: riel de comandas de cocina. Cada tarea es una
-   ficha de papel perforada con una etiqueta de color
-   (el semáforo de urgencia) prendida como un clip.
+   Concepto: riel de comandas de cocina, pero con la paleta
+   de una casa vieja llena de plantas — papel envejecido,
+   maderas y musgo en vez de tinta fría de oficina. Cada
+   tarea sigue siendo una ficha perforada con una etiqueta
+   de color (el semáforo de urgencia) prendida como un clip.
    ====================================================== */
 @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
 
 :root{
-  --paper:      #FBF7EC;   /* papel de ticket */
-  --paper-dim:  #F2ECDC;
-  --board:      #EFE7D6;   /* fondo del tablero, detrás de las fichas */
-  --charcoal:   #24262B;   /* barra superior, tinta fuerte */
-  --ink:        #2E2B26;
-  --ink-soft:   #6B6558;
-  --steel:      #5C7A89;
-  --steel-dim:  #C9D3D6;
+  --paper:      #FBF6E9;   /* papel de ticket, envejecido */
+  --paper-dim:  #F1EAD3;
+  --board:      #E9E2C9;   /* fondo del tablero, tierra clara */
+  --charcoal:   #2B2A20;   /* barra superior, madera oscura */
+  --ink:        #332F1F;
+  --ink-soft:   #6E6A4E;
+  --steel:      #5C7A52;   /* musgo — reemplaza el acento frío por uno vegetal */
+  --steel-dim:  #D7DEC0;
 
   --rojo:       #D64545;
   --rojo-bg:    #FBE7E6;
@@ -52,6 +54,7 @@ a{ color: var(--steel); }
   background: var(--charcoal);
   color: var(--paper);
   padding: 18px 20px;
+  border-bottom: 3px solid var(--steel);
   display:flex;
   align-items:center;
   justify-content: space-between;
@@ -281,6 +284,47 @@ input:focus, textarea:focus, select:focus{ outline: 2px solid var(--steel); outl
 
 .empty{
   text-align:center; padding: 30px 10px; color: var(--ink-soft); font-size:13px;
+}
+
+/* ---------- Bitácora ---------- */
+.bitacora-dia{ margin-bottom: 28px; }
+.bitacora-dia h3{
+  font-size: 13px; font-family: var(--font-mono); text-transform: none; letter-spacing: 0;
+  color: var(--charcoal); border-bottom: 2px solid var(--steel-dim);
+  padding-bottom: 6px; margin-bottom: 14px;
+}
+.bitacora-entradas{
+  position: relative; padding-left: 22px;
+  border-left: 2px dashed var(--steel-dim);
+  display: flex; flex-direction: column; gap: 14px;
+}
+.bitacora-entrada{
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--paper-dim);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: 0 2px 0 rgba(0,0,0,.05), 0 4px 10px rgba(43,42,32,.05);
+}
+.bitacora-entrada::before{
+  content: '🌿';
+  position: absolute; left: -33px; top: 12px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--board); border: 2px solid var(--steel-dim);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; line-height: 1;
+}
+.bitacora-tipo{
+  display: inline-block; font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  padding: 2px 8px; border-radius: 20px; background: var(--verde-bg); color: #276645;
+  margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em;
+}
+.bitacora-entrada h4{ font-size: 14.5px; margin: 0 0 4px; color: var(--ink); }
+.bitacora-entrada .meta{ font-size: 11.5px; color: var(--ink-soft); margin-bottom: 6px; }
+.bitacora-entrada .desc{ font-size: 13.5px; line-height: 1.45; color: var(--ink); }
+.bitacora-entrada img{
+  margin-top: 10px; max-width: 220px; width: 100%; border-radius: 3px;
+  border: 1px solid var(--steel-dim); display: block;
 }
 
 .toast{

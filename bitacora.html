@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mantenimiento_Miraflores — Bitácora</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">
+      <h1>🌿 Mantenimiento_Miraflores</h1>
+      <span>· bitácora de trabajo</span>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center;">
+      <a class="btn ghost small" href="panel.html">📋 Ver panel</a>
+      <a class="btn ghost small" href="index.html">+ Cargar tarea</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="periodicas-header">
+      <h2>📔 Lo que se fue haciendo</h2>
+      <button class="primary small" id="btnRegistrarTrabajo">+ Registrar trabajo</button>
+    </div>
+    <p style="margin-top:-6px; color:var(--ink-soft); font-size:13px;">
+      Se arma sola con las tareas que marcás como resueltas y las periódicas que marcás como hechas.
+      Si arreglaste algo que nadie había reportado, usá "Registrar trabajo" para dejarlo anotado.
+    </p>
+
+    <div id="lineaDeTiempo" style="margin-top:20px;"></div>
+  </div>
+
+  <div id="modalRoot"></div>
+  <div id="toast" class="toast" style="display:none;"></div>
+
+  <script src="config.js"></script>
+  <script>
+    let ENTRADAS = [];
+
+    function llamarAPI(action, data) {
+      return fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action, data })
+      }).then(r => r.json());
+    }
+
+    function onError(err) {
+      mostrarToast('Error: ' + (err.message || err));
+    }
+
+    function escapeHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s || '';
+      return d.innerHTML;
+    }
+
+    function mostrarToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.display = 'block';
+      setTimeout(() => t.style.display = 'none', 3000);
+    }
+
+    function comprimirImagen(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const maxAncho = 1200;
+            const escala = Math.min(1, maxAncho / img.width);
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width * escala;
+            canvas.height = img.height * escala;
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.75));
+          };
+          img.onerror = reject;
+          img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    /* ---------- Carga y armado de la línea de tiempo ---------- */
+    function cargarBitacora() {
+      Promise.all([
+        fetch(API_URL + '?action=tareas').then(r => r.json()),
+        fetch(API_URL + '?action=programadas').then(r => r.json())
+      ]).then(([tareas, programadas]) => {
+        const deTareas = tareas
+          .filter(t => t.estado === 'Resuelto')
+          .map(t => ({
+            fecha: t.fechaResolucion,
+            tipo: 'tarea',
+            titulo: t.titulo,
+            ubicacion: t.ubicacion,
+            desc: t.descripcion,
+            notas: t.notasResolucion,
+            foto: t.fotoDespues || t.fotoAntes || ''
+          }));
+
+        const deProgramadas = programadas
+          .filter(p => p.ultimaVezHecha)
+          .map(p => ({
+            fecha: p.ultimaVezHecha,
+            tipo: 'periodica',
+            titulo: p.titulo,
+            ubicacion: p.ubicacion,
+            desc: 'Tarea periódica — cada ' + p.frecuenciaDias + ' días',
+            notas: '',
+            foto: ''
+          }));
+
+        ENTRADAS = deTareas.concat(deProgramadas)
+          .filter(e => e.fecha)
+          .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+        render();
+      }).catch(onError);
+    }
+
+    function claveDia(fechaISO) {
+      const d = new Date(fechaISO);
+      return d.toDateString();
+    }
+
+    function tituloDia(fechaISO) {
+      const d = new Date(fechaISO);
+      const texto = d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      return texto.charAt(0).toUpperCase() + texto.slice(1);
+    }
+
+    function render() {
+      const cont = document.getElementById('lineaDeTiempo');
+      cont.innerHTML = '';
+
+      if (ENTRADAS.length === 0) {
+        cont.innerHTML = '<div class="empty">Todavía no hay nada anotado. A medida que resuelvas tareas o marques periódicas como hechas, va a ir apareciendo acá.</div>';
+        return;
+      }
+
+      const grupos = [];
+      const indicePorDia = {};
+      ENTRADAS.forEach(e => {
+        const clave = claveDia(e.fecha);
+        if (!(clave in indicePorDia)) {
+          indicePorDia[clave] = grupos.length;
+          grupos.push({ fecha: e.fecha, entradas: [] });
+        }
+        grupos[indicePorDia[clave]].entradas.push(e);
+      });
+
+      grupos.forEach(grupo => {
+        const seccion = document.createElement('div');
+        seccion.className = 'bitacora-dia';
+        seccion.innerHTML = '<h3>' + tituloDia(grupo.fecha) + '</h3><div class="bitacora-entradas"></div>';
+        const lista = seccion.querySelector('.bitacora-entradas');
+        grupo.entradas.forEach(e => lista.appendChild(fichaEntrada(e)));
+        cont.appendChild(seccion);
+      });
+    }
+
+    function fichaEntrada(e) {
+      const div = document.createElement('div');
+      div.className = 'bitacora-entrada';
+      const hora = new Date(e.fecha).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+      const etiqueta = e.tipo === 'periodica' ? '🔁 Periódica' : '🔧 Tarea resuelta';
+
+      div.innerHTML =
+        '<span class="bitacora-tipo">' + etiqueta + '</span>' +
+        '<h4>' + escapeHtml(e.titulo) + '</h4>' +
+        '<div class="meta">' + escapeHtml(e.ubicacion) + ' · ' + hora + '</div>' +
+        (e.desc ? '<div class="desc">' + escapeHtml(e.desc) + '</div>' : '') +
+        (e.notas ? '<div class="desc"><b>Notas:</b> ' + escapeHtml(e.notas) + '</div>' : '') +
+        (e.foto ? '<img src="' + e.foto + '">' : '');
+
+      return div;
+    }
+
+    /* ---------- Registrar un trabajo hecho ---------- */
+    document.getElementById('btnRegistrarTrabajo').addEventListener('click', abrirModalRegistrar);
+
+    function abrirModalRegistrar() {
+      const root = document.getElementById('modalRoot');
+      root.innerHTML =
+        '<div class="modal-bg" id="modalBg"><div class="modal">' +
+          '<h2 style="font-size:17px;">Registrar trabajo</h2>' +
+          '<p class="hint" style="margin-top:6px;">Para algo que ya arreglaste y nadie había reportado.</p>' +
+          '<label>¿Qué arreglaste?</label>' +
+          '<input type="text" id="trabTitulo" placeholder="Ej: Podé la enredadera del patio">' +
+          '<label>Ubicación</label>' +
+          '<select id="trabUbicacion">' +
+            '<option>Cocina</option><option>Salón</option><option>Baño</option>' +
+            '<option>Barra</option><option>Depósito</option><option>Exterior</option><option>Otro</option>' +
+          '</select>' +
+          '<label>Descripción</label>' +
+          '<textarea id="trabDescripcion" placeholder="Contá qué encontraste y qué hiciste"></textarea>' +
+          '<label>Notas (opcional)</label>' +
+          '<textarea id="trabNotas" placeholder="Repuestos usados, algo a seguir revisando, etc."></textarea>' +
+          '<label>Foto (opcional)</label>' +
+          '<input type="file" id="trabFoto" accept="image/*" capture="environment">' +
+          '<button class="primary" id="btnGuardarTrabajo" style="margin-top:14px; width:100%;">Guardar en la bitácora</button>' +
+          '<div style="margin-top:10px; text-align:right;"><button class="ghost small" id="btnCerrarModal">Cerrar</button></div>' +
+        '</div></div>';
+
+      document.getElementById('modalBg').addEventListener('click', (e) => {
+        if (e.target.id === 'modalBg') root.innerHTML = '';
+      });
+      document.getElementById('btnCerrarModal').addEventListener('click', () => root.innerHTML = '');
+
+      document.getElementById('btnGuardarTrabajo').addEventListener('click', async () => {
+        const titulo = document.getElementById('trabTitulo').value.trim();
+        if (!titulo) { mostrarToast('Contá qué arreglaste'); return; }
+
+        const btn = document.getElementById('btnGuardarTrabajo');
+        btn.disabled = true;
+        btn.textContent = 'Guardando...';
+
+        const datos = {
+          titulo: titulo,
+          ubicacion: document.getElementById('trabUbicacion').value,
+          descripcion: document.getElementById('trabDescripcion').value,
+          notas: document.getElementById('trabNotas').value,
+          foto: null
+        };
+
+        const fotoFile = document.getElementById('trabFoto').files[0];
+        try {
+          if (fotoFile) {
+            datos.foto = await comprimirImagen(fotoFile);
+          }
+          await llamarAPI('registrarTrabajo', datos);
+          root.innerHTML = '';
+          mostrarToast('Registrado ✓');
+          cargarBitacora();
+        } catch (err) {
+          btn.disabled = false;
+          btn.textContent = 'Guardar en la bitácora';
+          onError(err);
+        }
+      });
+    }
+
+    cargarBitacora();
+  </script>
+</body>
+</html>

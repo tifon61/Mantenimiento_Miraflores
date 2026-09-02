@@ -60,6 +60,9 @@ function doPost(e) {
       case 'crearTarea':
         resultado = crearTarea(datos);
         break;
+      case 'registrarTrabajo':
+        resultado = registrarTrabajo(datos);
+        break;
       case 'actualizarEstado':
         resultado = actualizarEstado(datos.id, datos.nuevoEstado, datos.notas, datos.fotoDespuesBase64);
         break;
@@ -180,6 +183,41 @@ function crearTarea(datos) {
   if (datos.urgencia === 'Rojo') {
     enviarAvisoUrgente_(id, datos.titulo, datos.descripcion, datos.ubicacion);
   }
+
+  return { ok: true, id: id };
+}
+
+// Registra un trabajo que ya se hizo (por ejemplo, algo que encontraste
+// y arreglaste vos mismo durante la visita, sin que nadie lo haya
+// reportado antes). Queda guardado como una tarea ya resuelta, así
+// aparece directo en el historial y en la Bitácora.
+// "datos" = {titulo, ubicacion, descripcion, notas, foto}
+function registrarTrabajo(datos) {
+  const sheet = getDB_();
+  const id = 'M-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyMMdd-HHmmss');
+  const ahora = new Date();
+
+  let urlFoto = '';
+  if (datos.foto) {
+    urlFoto = guardarFoto_(datos.foto, id + '_bitacora');
+  }
+
+  sheet.appendRow([
+    id,
+    ahora,
+    datos.titulo,
+    datos.descripcion || '',
+    datos.ubicacion,
+    'Verde',
+    'Resuelto',
+    'Mantenimiento',
+    '',
+    urlFoto,
+    ahora,
+    ahora,
+    'Registrado en el momento',
+    datos.notas || ''
+  ]);
 
   return { ok: true, id: id };
 }
