@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Maxi Arreglos — Facturas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --negro: #1a1a1a;
+    --negro-2: #262626;
+    --naranja: #f7941d;
+    --gris: #6b6b6b;
+    --borde: #c9c9c9;
+    --board: #e9e9e9;
+  }
+  *{ box-sizing: border-box; }
+  html,body{
+    margin:0; padding:0; background: var(--board);
+    font-family: 'Montserrat', sans-serif; color: var(--negro);
+  }
+  .wrap{ max-width: 900px; margin: 0 auto; padding: 24px 16px 80px; }
+
+  h1{ font-size: 18px; text-align:center; margin: 0 0 4px; }
+  .sub{ text-align:center; color:var(--gris); font-size:13px; margin-bottom: 20px; }
+
+  .controles{
+    display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom: 22px;
+  }
+  .controles button, .controles label.btn{
+    font-family:inherit; font-weight:700; font-size:13px; cursor:pointer;
+    border:2px solid var(--negro); background:#fff; color:var(--negro);
+    padding:9px 16px; border-radius:4px; display:inline-flex; align-items:center; gap:6px;
+  }
+  .controles button.primario{ background:var(--naranja); border-color:var(--naranja); color:#fff; }
+  .controles button:active{ transform: translateY(1px); }
+  #logoInput{ display:none; }
+
+  /* ---------- La hoja de factura (esto es lo que se descarga) ---------- */
+  #hoja{
+    background:#fff; width:100%; max-width:820px; margin:0 auto;
+    padding: 26px 30px 30px; box-shadow: 0 10px 30px rgba(0,0,0,.15);
+  }
+
+  .header{ display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap; }
+
+  /* --- logo recreado --- */
+  .logo-mark{ position:relative; width:230px; flex:0 0 230px; }
+  .logo-svg{ width:100%; display:block; }
+  .logo-texto{
+    position:absolute; left:8%; top:26%; width:78%; text-align:center; line-height:.85;
+  }
+  .logo-texto .maxi{
+    display:block; font-family:'Montserrat',sans-serif; font-weight:900; font-style:italic;
+    font-size:38px; color:#fff; letter-spacing:-1px;
+    text-shadow: 2px 2px 0 rgba(0,0,0,.35);
+  }
+  .logo-texto .arreglos{
+    display:block; font-family:'Montserrat',sans-serif; font-weight:900; font-style:italic;
+    font-size:30px; color:var(--naranja); letter-spacing:-1px; margin-top:-4px;
+    text-shadow: 2px 2px 0 rgba(0,0,0,.35);
+  }
+  .logo-banner{
+    margin-top:6px; background: var(--negro); color:#fff; text-align:center;
+    font-size:9px; font-weight:700; letter-spacing:.06em; padding:4px 6px;
+    border-top:2px solid var(--naranja); border-bottom:2px solid var(--naranja);
+    clip-path: polygon(4% 0, 96% 0, 100% 100%, 0% 100%);
+  }
+  #logoImgCustom{ width:100%; display:block; }
+
+  .info-derecha{ flex:1; min-width:220px; }
+  .info-derecha .item{
+    display:flex; align-items:center; gap:10px; font-weight:700; font-size:14px;
+    margin-bottom:9px; white-space:nowrap;
+  }
+  .info-derecha .item .check{
+    color: var(--naranja); font-size:16px; flex:0 0 auto;
+  }
+  .contacto{ margin-top:10px; display:flex; flex-direction:column; gap:8px; }
+  .contacto .fila{ display:flex; align-items:center; gap:10px; font-weight:800; font-size:16px; }
+  .contacto .icono{
+    width:26px; height:26px; border-radius:50%; display:inline-flex; align-items:center;
+    justify-content:center; font-size:14px; flex:0 0 auto; color:#fff;
+  }
+  .icono.wa{ background:#25D366; }
+  .icono.ig{ background: radial-gradient(circle at 30% 110%, #fdf497 0%, #fdf497 5%, #fd5949 45%,#d6249f 60%,#285AEB 90%); }
+
+  .rule{ height:4px; background:var(--naranja); margin: 16px 0 14px; border-radius:2px; }
+
+  .datos-cliente{
+    display:flex; gap:24px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;
+  }
+  .campo{ flex:1; min-width:180px; }
+  .campo label{ display:block; font-size:11px; font-weight:700; color:var(--gris); margin-bottom:2px; text-transform:uppercase; letter-spacing:.04em; }
+  .campo input{
+    width:100%; border:none; border-bottom:1.5px solid var(--negro); font-family:inherit;
+    font-size:15px; font-weight:600; padding:4px 2px; background:transparent; color:var(--negro);
+  }
+  .campo input:focus{ outline:none; border-bottom-color:var(--naranja); }
+
+  .fecha-box{ flex:0 0 150px; text-align:center; }
+  .fecha-box .etiqueta{
+    background:var(--negro); color:#fff; font-size:11px; font-weight:700;
+    letter-spacing:.08em; padding:5px; border-radius:3px 3px 0 0;
+  }
+  .fecha-box input{
+    width:100%; text-align:center; border:1.5px solid var(--negro); border-top:none;
+    border-radius:0 0 3px 3px; padding:7px 4px; font-family:inherit; font-weight:800;
+    font-size:15px; background:#fff; color:var(--negro);
+  }
+  .fecha-box input:focus{ outline:none; }
+
+  table{ width:100%; border-collapse:collapse; margin-top:6px; }
+  thead th{
+    background:var(--negro); color:#fff; font-size:12px; text-transform:uppercase;
+    letter-spacing:.05em; padding:9px 10px; text-align:left; font-weight:700;
+  }
+  thead th.col-total{ text-align:center; width:120px; }
+  tbody td{ border:1px solid var(--borde); padding:0; vertical-align:top; }
+  tbody td input, tbody td textarea{
+    width:100%; border:none; background:transparent; font-family:inherit; color:var(--negro);
+    padding:9px 10px; font-size:13.5px; resize:none; display:block;
+  }
+  tbody td.col-total input{ text-align:center; font-weight:700; }
+  tbody td input:focus, tbody td textarea:focus{ outline: 2px solid var(--naranja); outline-offset:-2px; }
+  tbody tr td.servicio input{ font-weight:700; }
+
+  .pie{
+    display:flex; justify-content:space-between; align-items:flex-end; margin-top:20px; gap:16px; flex-wrap:wrap;
+  }
+  .gracias{
+    font-family:'Caveat', cursive; font-size:30px; font-weight:700; color:var(--negro);
+    position:relative; padding-bottom:6px;
+  }
+  .gracias::after{
+    content:''; position:absolute; left:0; bottom:-2px; width:100%; height:6px;
+    background: repeating-linear-gradient(100deg, var(--naranja) 0 10px, transparent 10px 14px);
+    border-radius: 3px;
+  }
+  .total-box{ display:flex; align-items:stretch; border:2px solid var(--negro); border-radius:4px; overflow:hidden; }
+  .total-box .etiqueta{
+    background:var(--negro); color:#fff; font-weight:800; font-size:14px;
+    display:flex; align-items:center; padding:0 14px; letter-spacing:.04em;
+  }
+  .total-box input{
+    border:none; font-family:inherit; font-weight:800; font-size:17px; padding:8px 14px;
+    min-width:120px; text-align:center; color:var(--negro);
+  }
+  .total-box input:focus{ outline:none; background:#fdf3e6; }
+
+  /* controles de filas — no se descargan en la imagen */
+  .fila-acciones{ text-align:center; }
+  .fila-acciones button{
+    font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;
+    border:1.5px solid var(--gris); background:#fff; color:var(--gris); border-radius:3px; padding:2px 8px;
+  }
+
+  .hint{ text-align:center; color:var(--gris); font-size:12px; margin-top:18px; }
+
+  @media (max-width: 640px){
+    #hoja{ padding: 18px 14px 20px; }
+    .logo-mark{ flex:0 0 170px; width:170px; }
+    .logo-texto .maxi{ font-size:28px; }
+    .logo-texto .arreglos{ font-size:22px; }
+    .info-derecha .item{ font-size:12px; }
+    .contacto .fila{ font-size:13px; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🧾 Generador de facturas — Maxi Arreglos</h1>
+    <p class="sub">Completá los datos y descargá la factura como imagen, lista para mandar por WhatsApp.</p>
+
+    <div class="controles">
+      <button class="primario" id="btnDescargar">📥 Descargar factura</button>
+      <button id="btnAgregarFila">➕ Agregar fila</button>
+      <button id="btnQuitarFila">➖ Quitar fila</button>
+      <label class="btn" for="logoInput">🖼 Cambiar logo</label>
+      <input type="file" id="logoInput" accept="image/*">
+      <button id="btnLimpiar">↺ Limpiar todo</button>
+    </div>
+
+    <div id="hoja">
+      <div class="header">
+        <div class="logo-mark" id="logoMark">
+          <svg class="logo-svg" viewBox="0 0 230 190" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="10,95 115,15 220,95 205,95 115,28 25,95" fill="#f7941d"></polygon>
+            <polygon points="115,28 205,95 25,95" fill="#1a1a1a"></polygon>
+            <g transform="translate(148,18) rotate(40)">
+              <rect x="-4" y="0" width="8" height="70" fill="#111"></rect>
+              <circle cx="0" cy="-6" r="10" fill="#111"></circle>
+            </g>
+            <g transform="translate(172,30) rotate(40)">
+              <rect x="-3" y="0" width="6" height="55" fill="#111"></rect>
+              <rect x="-9" y="-14" width="18" height="16" rx="3" fill="#111"></rect>
+            </g>
+          </svg>
+          <div class="logo-texto">
+            <span class="maxi">Maxi</span>
+            <span class="arreglos">ARREGLOS</span>
+          </div>
+          <div class="logo-banner">MANTENIMIENTO EN GENERAL</div>
+        </div>
+
+        <div class="info-derecha">
+          <div class="item"><span class="check">✔</span> MANTENIMIENTO EN GENERAL</div>
+          <div class="item"><span class="check">✔</span> ELECTRICIDAD, PLOMERIA, PINTURA.</div>
+          <div class="item"><span class="check">✔</span> DURLOCK, HERRERIA</div>
+          <div class="item"><span class="check">✔</span> AIRE ACONDICIONADO</div>
+          <div class="contacto">
+            <div class="fila"><span class="icono wa">☎</span> 221 360 3770</div>
+            <div class="fila"><span class="icono ig">📷</span> MaxiArreglos</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rule"></div>
+
+      <div class="datos-cliente">
+        <div class="campo">
+          <label>Cliente</label>
+          <input type="text" id="campoCliente" placeholder="Nombre del cliente">
+        </div>
+        <div class="campo">
+          <label>Celular</label>
+          <input type="text" id="campoCelular" placeholder="Número de contacto">
+        </div>
+        <div class="fecha-box">
+          <div class="etiqueta">FECHA</div>
+          <input type="text" id="campoFecha" placeholder="dd/mm/aaaa">
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width:22%;">Servicio</th>
+            <th>Descripción</th>
+            <th class="col-total">Total</th>
+          </tr>
+        </thead>
+        <tbody id="filasFactura"></tbody>
+      </table>
+
+      <div class="pie">
+        <div class="gracias">¡Gracias por la preferencia!</div>
+        <div class="total-box">
+          <span class="etiqueta">TOTAL:</span>
+          <input type="text" id="campoTotal" placeholder="$ 0">
+        </div>
+      </div>
+    </div>
+
+    <p class="hint">El botón "Calcular" no existe: el total se suma solo a partir de lo que pongas en cada fila — también podés escribirlo a mano. El logo de arriba es una recreación aproximada; con "🖼 Cambiar logo" podés subir el archivo real cuando lo tengas (queda guardado en este navegador).</p>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script>
+    const CANTIDAD_FILAS_INICIAL = 9;
+    const filasCont = document.getElementById('filasFactura');
+
+    function crearFila() {
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="servicio"><input type="text"></td>' +
+        '<td><input type="text"></td>' +
+        '<td class="col-total"><input type="text" class="total-fila" placeholder="$ 0"></td>';
+      tr.querySelector('.total-fila').addEventListener('input', recalcularTotal);
+      filasCont.appendChild(tr);
+    }
+
+    for (let i = 0; i < CANTIDAD_FILAS_INICIAL; i++) crearFila();
+
+    document.getElementById('btnAgregarFila').addEventListener('click', crearFila);
+    document.getElementById('btnQuitarFila').addEventListener('click', () => {
+      if (filasCont.children.length > 1) filasCont.removeChild(filasCont.lastElementChild);
+    });
+
+    function numeroDesdeTexto(txt) {
+      const soloDigitos = (txt || '').replace(/[^0-9]/g, '');
+      return soloDigitos ? parseInt(soloDigitos, 10) : 0;
+    }
+
+    function formatearMoneda(n) {
+      return '$ ' + n.toLocaleString('es-AR');
+    }
+
+    function recalcularTotal() {
+      const totales = Array.from(document.querySelectorAll('.total-fila'));
+      const suma = totales.reduce((acc, input) => acc + numeroDesdeTexto(input.value), 0);
+      document.getElementById('campoTotal').value = suma > 0 ? formatearMoneda(suma) : '';
+    }
+
+    // Fecha de hoy por default, formato dd/mm/aaaa
+    const hoy = new Date();
+    document.getElementById('campoFecha').value =
+      String(hoy.getDate()).padStart(2, '0') + '/' +
+      String(hoy.getMonth() + 1).padStart(2, '0') + '/' +
+      hoy.getFullYear();
+
+    document.getElementById('btnLimpiar').addEventListener('click', () => {
+      if (!confirm('¿Borrar todos los datos cargados?')) return;
+      document.getElementById('campoCliente').value = '';
+      document.getElementById('campoCelular').value = '';
+      document.getElementById('campoTotal').value = '';
+      document.querySelectorAll('#filasFactura input').forEach(i => i.value = '');
+    });
+
+    /* ---------- Logo propio (opcional) ---------- */
+    const LOGO_KEY = 'maxiarreglos_logo';
+    function aplicarLogoGuardado() {
+      const guardado = localStorage.getItem(LOGO_KEY);
+      if (!guardado) return;
+      const mark = document.getElementById('logoMark');
+      mark.innerHTML = '<img id="logoImgCustom" src="' + guardado + '">';
+    }
+    try { aplicarLogoGuardado(); } catch (err) {}
+
+    document.getElementById('logoInput').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target.result;
+        try { localStorage.setItem(LOGO_KEY, dataUrl); } catch (err) {}
+        document.getElementById('logoMark').innerHTML = '<img id="logoImgCustom" src="' + dataUrl + '">';
+      };
+      reader.readAsDataURL(file);
+    });
+
+    /* ---------- Descargar como imagen ---------- */
+    document.getElementById('btnDescargar').addEventListener('click', () => {
+      const btn = document.getElementById('btnDescargar');
+      btn.disabled = true;
+      btn.textContent = 'Generando...';
+      html2canvas(document.getElementById('hoja'), { scale: 2, backgroundColor: '#ffffff', useCORS: true })
+        .then(canvas => {
+          const nombreCliente = (document.getElementById('campoCliente').value || 'sin-nombre')
+            .trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+          const link = document.createElement('a');
+          link.download = 'factura-' + (nombreCliente || 'maxi-arreglos') + '.png';
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+        })
+        .catch(err => alert('No se pudo generar la imagen: ' + err))
+        .finally(() => {
+          btn.disabled = false;
+          btn.textContent = '📥 Descargar factura';
+        });
+    });
+  </script>
+</body>
+</html>
