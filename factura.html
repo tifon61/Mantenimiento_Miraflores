@@ -59,12 +59,7 @@
   }
   .contacto{ margin-top:10px; display:flex; flex-direction:column; gap:8px; }
   .contacto .fila{ display:flex; align-items:center; gap:10px; font-weight:800; font-size:16px; }
-  .contacto .icono{
-    width:26px; height:26px; border-radius:50%; display:inline-flex; align-items:center;
-    justify-content:center; font-size:14px; flex:0 0 auto; color:#fff;
-  }
-  .icono.wa{ background:#25D366; }
-  .icono.ig{ background: radial-gradient(circle at 30% 110%, #fdf497 0%, #fdf497 5%, #fd5949 45%,#d6249f 60%,#285AEB 90%); }
+  .contacto .icono{ width:24px; height:24px; object-fit:contain; display:block; flex:0 0 auto; }
 
   .rule{ height:4px; background:var(--naranja); margin: 16px 0 14px; border-radius:2px; }
 
@@ -172,8 +167,8 @@
           <div class="item"><span class="check">✔</span> DURLOCK, HERRERIA</div>
           <div class="item"><span class="check">✔</span> AIRE ACONDICIONADO</div>
           <div class="contacto">
-            <div class="fila"><span class="icono wa">☎</span> 221 360 3770</div>
-            <div class="fila"><span class="icono ig">📷</span> MaxiArreglos</div>
+            <div class="fila"><img class="icono" src="imagenes/whatsapp.png" alt="WhatsApp"> 221 360 3770</div>
+            <div class="fila"><img class="icono" src="imagenes/ig.png" alt="Instagram"> MaxiArreglos</div>
           </div>
         </div>
       </div>
