@@ -45,29 +45,9 @@
 
   .header{ display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap; }
 
-  /* --- logo recreado --- */
-  .logo-mark{ position:relative; width:230px; flex:0 0 230px; }
-  .logo-svg{ width:100%; display:block; }
-  .logo-texto{
-    position:absolute; left:8%; top:26%; width:78%; text-align:center; line-height:.85;
-  }
-  .logo-texto .maxi{
-    display:block; font-family:'Montserrat',sans-serif; font-weight:900; font-style:italic;
-    font-size:38px; color:#fff; letter-spacing:-1px;
-    text-shadow: 2px 2px 0 rgba(0,0,0,.35);
-  }
-  .logo-texto .arreglos{
-    display:block; font-family:'Montserrat',sans-serif; font-weight:900; font-style:italic;
-    font-size:30px; color:var(--naranja); letter-spacing:-1px; margin-top:-4px;
-    text-shadow: 2px 2px 0 rgba(0,0,0,.35);
-  }
-  .logo-banner{
-    margin-top:6px; background: var(--negro); color:#fff; text-align:center;
-    font-size:9px; font-weight:700; letter-spacing:.06em; padding:4px 6px;
-    border-top:2px solid var(--naranja); border-bottom:2px solid var(--naranja);
-    clip-path: polygon(4% 0, 96% 0, 100% 100%, 0% 100%);
-  }
-  #logoImgCustom{ width:100%; display:block; }
+  /* --- logo --- */
+  .logo-mark{ width:190px; flex:0 0 190px; }
+  .logo-mark img{ width:100%; display:block; }
 
   .info-derecha{ flex:1; min-width:220px; }
   .info-derecha .item{
@@ -160,9 +140,7 @@
 
   @media (max-width: 640px){
     #hoja{ padding: 18px 14px 20px; }
-    .logo-mark{ flex:0 0 170px; width:170px; }
-    .logo-texto .maxi{ font-size:28px; }
-    .logo-texto .arreglos{ font-size:22px; }
+    .logo-mark{ flex:0 0 140px; width:140px; }
     .info-derecha .item{ font-size:12px; }
     .contacto .fila{ font-size:13px; }
   }
@@ -185,23 +163,7 @@
     <div id="hoja">
       <div class="header">
         <div class="logo-mark" id="logoMark">
-          <svg class="logo-svg" viewBox="0 0 230 190" xmlns="http://www.w3.org/2000/svg">
-            <polygon points="10,95 115,15 220,95 205,95 115,28 25,95" fill="#f7941d"></polygon>
-            <polygon points="115,28 205,95 25,95" fill="#1a1a1a"></polygon>
-            <g transform="translate(148,18) rotate(40)">
-              <rect x="-4" y="0" width="8" height="70" fill="#111"></rect>
-              <circle cx="0" cy="-6" r="10" fill="#111"></circle>
-            </g>
-            <g transform="translate(172,30) rotate(40)">
-              <rect x="-3" y="0" width="6" height="55" fill="#111"></rect>
-              <rect x="-9" y="-14" width="18" height="16" rx="3" fill="#111"></rect>
-            </g>
-          </svg>
-          <div class="logo-texto">
-            <span class="maxi">Maxi</span>
-            <span class="arreglos">ARREGLOS</span>
-          </div>
-          <div class="logo-banner">MANTENIMIENTO EN GENERAL</div>
+          <img src="imagenes/logo-maxi-arreglos.png" alt="Maxi Arreglos">
         </div>
 
         <div class="info-derecha">
@@ -253,7 +215,7 @@
       </div>
     </div>
 
-    <p class="hint">El botón "Calcular" no existe: el total se suma solo a partir de lo que pongas en cada fila — también podés escribirlo a mano. El logo de arriba es una recreación aproximada; con "🖼 Cambiar logo" podés subir el archivo real cuando lo tengas (queda guardado en este navegador).</p>
+    <p class="hint">El total se suma solo a partir de lo que pongas en cada fila — también podés escribirlo a mano. Con "🖼 Cambiar logo" podés reemplazar el logo por otra versión cuando quieras (queda guardado en este navegador).</p>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
